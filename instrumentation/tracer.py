@@ -107,6 +107,9 @@ class SpanTracer:
         span_id, _ = self.start_span(operation, trace_id, parent_span_id)
         try:
             yield span_id
+        except TimeoutError:
+            self.end_span(span_id, "timeout", {})
+            raise
         except Exception:
             self.end_span(span_id, "error", {})
             raise
