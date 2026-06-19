@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 from uuid import uuid4
 
+from instrumentation.metrics import LatencyMetrics
 from instrumentation.span import SpanRecord
 
 
@@ -18,6 +19,7 @@ class SpanTracer:
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self.metrics = LatencyMetrics()
         self._spans: dict[str, tuple[str, float, str, Optional[str]]] = {}
         self._initialize_schema()
 
