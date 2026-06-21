@@ -4,7 +4,10 @@ import json
 import time
 from typing import Any, Literal
 
-import ollama
+try:
+    import ollama
+except ModuleNotFoundError:  # pragma: no cover
+    ollama = None
 
 from instrumentation.tracer import SpanTracer
 
@@ -16,6 +19,8 @@ class LLMAgent:
         self.timeout_ms = timeout_ms
 
     def generate_signal(self, features_row: dict, trace_id: str) -> dict:
+        if ollama is None:
+            raise ModuleNotFoundError("ollama")
         started_at = time.perf_counter()
         span_id = ""
         timed_out = False
