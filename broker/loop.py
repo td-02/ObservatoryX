@@ -55,10 +55,18 @@ class TradingLoop:
         )
         conn.commit()
 
-    def run(self, symbols: list[str], bars_df: dict[str, pd.DataFrame], tracer: SpanTracer):
+    def run(
+        self,
+        symbols: list[str],
+        bars_df: dict[str, pd.DataFrame],
+        tracer: SpanTracer,
+        mode: str = "paper",
+        model: str = "mistral",
+        timeout_ms: float = 3000.0,
+    ):
         executor = PaperExecutor()
         heuristic_agent = HeuristicAgent()
-        llm_agent = LLMAgent(model="llama3", tracer=tracer)
+        llm_agent = LLMAgent(model=model, tracer=tracer, timeout_ms=timeout_ms)
         policy = EscalationPolicy(tracer=tracer)
 
         with sqlite3.connect(self.db_path) as conn:
@@ -76,7 +84,11 @@ class TradingLoop:
                 symbol = str(row["symbol"])
                 trace_id = f"{symbol}-{row['timestamp']}"
                 decision = policy.decide(row, trace_id, heuristic_agent, llm_agent)
-                result = executor.submit_order(symbol, decision)
+                result = {"action": "hold"}
+                if mode == "paper":
+                    result = executor.submit_order(symbol, decision)
+                elif mode == "backtest":
+                    result = {"action": "simulated", "fill_price": float(row.get("close", 0.0))}
                 pnl_est = 0.0
                 if decision.get("signal") == "BUY":
                     pnl_est = float(row.get("close", 0.0)) * float(result.get("qty", 0))
