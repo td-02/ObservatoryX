@@ -4,15 +4,27 @@ import math
 import os
 from typing import Any
 
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockLatestTradeRequest
-from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
-from alpaca.trading.requests import MarketOrderRequest
+try:
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockLatestTradeRequest
+    from alpaca.trading.client import TradingClient
+    from alpaca.trading.enums import OrderSide, TimeInForce
+    from alpaca.trading.requests import MarketOrderRequest
+except ModuleNotFoundError:  # pragma: no cover
+    StockHistoricalDataClient = None
+    StockLatestTradeRequest = None
+    TradingClient = None
+    OrderSide = None
+    TimeInForce = None
+    MarketOrderRequest = None
 
 
 class PaperExecutor:
     def __init__(self) -> None:
+        if TradingClient is None or StockHistoricalDataClient is None:
+            raise ModuleNotFoundError(
+                "alpaca-py is required for paper mode. Install project dependencies first."
+            )
         self.api_key = os.getenv("ALPACA_API_KEY", "")
         self.secret_key = os.getenv("ALPACA_SECRET_KEY", "")
         self.base_url = os.getenv("ALPACA_BASE_URL", "")
@@ -28,6 +40,8 @@ class PaperExecutor:
         )
 
     def _latest_price(self, symbol: str) -> float:
+        if StockLatestTradeRequest is None:
+            raise ModuleNotFoundError("alpaca-py is required for latest price lookup.")
         latest = self.data_client.get_stock_latest_trade(
             StockLatestTradeRequest(symbol_or_symbols=symbol)
         )

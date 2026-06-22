@@ -7,9 +7,16 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 import pandas as pd
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
-from alpaca.data.timeframe import TimeFrame
+
+try:
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
+    from alpaca.data.timeframe import TimeFrame
+except ModuleNotFoundError:  # pragma: no cover
+    StockHistoricalDataClient = None
+    StockBarsRequest = None
+    StockLatestTradeRequest = None
+    TimeFrame = None
 
 
 UNIVERSE = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL", "JPM", "BAC", "SPY"]
@@ -29,6 +36,10 @@ class AlpacaFeed:
     base_url: str
 
     def __init__(self) -> None:
+        if StockHistoricalDataClient is None:
+            raise ModuleNotFoundError(
+                "alpaca-py is required for collect mode. Install project dependencies first."
+            )
         self.api_key = os.getenv("ALPACA_API_KEY", "")
         self.secret_key = os.getenv("ALPACA_SECRET_KEY", "")
         self.base_url = os.getenv("ALPACA_BASE_URL", "")
@@ -54,6 +65,9 @@ class AlpacaFeed:
         raise DataFeedError(str(last_error) if last_error else "Unknown error", symbol)
 
     def get_bars(self, symbol: str, start: date, end: date) -> pd.DataFrame:
+        if StockBarsRequest is None or TimeFrame is None:
+            raise ModuleNotFoundError("alpaca-py is required for bar collection.")
+
         def action() -> pd.DataFrame:
             request = StockBarsRequest(
                 symbol_or_symbols=symbol,
@@ -80,6 +94,9 @@ class AlpacaFeed:
         return self._with_retries(action, symbol)
 
     def get_latest_bar(self, symbol: str) -> dict[str, Any]:
+        if StockLatestTradeRequest is None:
+            raise ModuleNotFoundError("alpaca-py is required for latest bar lookup.")
+
         def action() -> dict[str, Any]:
             request = StockLatestTradeRequest(symbol_or_symbols=symbol)
             latest = self._client.get_stock_latest_trade(request)

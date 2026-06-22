@@ -26,7 +26,10 @@ def _ensure_cache_dir() -> None:
 def _load_cached_bars(symbols: list[str], cache_dir: Path) -> dict[str, pd.DataFrame]:
     bars: dict[str, pd.DataFrame] = {}
     for symbol in symbols:
-        bars[symbol] = pd.read_parquet(cache_dir / f"{symbol}.parquet")
+        path = cache_dir / f"{symbol}.parquet"
+        if not path.exists():
+            raise FileNotFoundError(f"Missing cached bars file: {path}")
+        bars[symbol] = pd.read_parquet(path)
     return bars
 
 
@@ -89,28 +92,34 @@ def _build_trading_table(report: dict) -> Table:
 
 
 def cmd_collect(args: argparse.Namespace) -> None:
-    _ensure_cache_dir()
-    feed = AlpacaFeed()
-    start = date.fromisoformat(args.start)
-    end = date.fromisoformat(args.end)
-    for symbol in args.symbols:
-        bars = feed.get_bars(symbol, start, end)
-        bars.to_parquet(CACHE_DIR / f"{symbol}.parquet", index=False)
+    try:
+        _ensure_cache_dir()
+        feed = AlpacaFeed()
+        start = date.fromisoformat(args.start)
+        end = date.fromisoformat(args.end)
+        for symbol in args.symbols:
+            bars = feed.get_bars(symbol, start, end)
+            bars.to_parquet(CACHE_DIR / f"{symbol}.parquet", index=False)
+    except ModuleNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 def cmd_run(args: argparse.Namespace) -> None:
-    cache_dir = Path(args.bars)
-    bars_df = _load_cached_bars(args.symbols, cache_dir)
-    tracer = SpanTracer()
-    loop = TradingLoop()
-    loop.run(
-        symbols=args.symbols,
-        bars_df=bars_df,
-        tracer=tracer,
-        mode=args.mode,
-        model=args.model,
-        timeout_ms=float(args.timeout),
-    )
+    try:
+        cache_dir = Path(args.bars)
+        bars_df = _load_cached_bars(args.symbols, cache_dir)
+        tracer = SpanTracer()
+        loop = TradingLoop()
+        loop.run(
+            symbols=args.symbols,
+            bars_df=bars_df,
+            tracer=tracer,
+            mode=args.mode,
+            model=args.model,
+            timeout_ms=float(args.timeout),
+        )
+    except ModuleNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 def cmd_analyze(args: argparse.Namespace) -> None:
