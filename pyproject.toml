@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "paper-trading-observatory"
 version = "0.1.0"
-description = "Paper trading observability scaffold."
+description = "A paper trading observatory for ingestion, signals, execution, tracing, and performance analysis."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
