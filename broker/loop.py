@@ -9,8 +9,6 @@ from rich.console import Console
 from rich.table import Table
 
 from agent.heuristic import HeuristicAgent
-from agent.llm_agent import LLMAgent
-from broker.executor import PaperExecutor
 from data.features import compute_features
 from scheduler.escalation import EscalationPolicy
 from instrumentation.tracer import SpanTracer
@@ -55,6 +53,20 @@ class TradingLoop:
         )
         conn.commit()
 
+    def _simulate_fill(self, row: dict, signal: dict) -> dict:
+        close_price = float(row.get("close", 0.0))
+        qty = 0
+        if signal.get("signal") == "BUY":
+            qty = 1
+        elif signal.get("signal") == "SELL":
+            qty = 1
+        return {
+            "action": "simulated",
+            "fill_price": close_price,
+            "qty": qty,
+            "status": "filled",
+        }
+
     def run(
         self,
         symbols: list[str],
@@ -64,10 +76,16 @@ class TradingLoop:
         model: str = "mistral",
         timeout_ms: float = 3000.0,
     ):
-        executor = PaperExecutor()
         heuristic_agent = HeuristicAgent()
-        llm_agent = LLMAgent(model=model, tracer=tracer, timeout_ms=timeout_ms)
         policy = EscalationPolicy(tracer=tracer)
+        executor = None
+        llm_agent = None
+        if mode == "paper":
+            from broker.executor import PaperExecutor
+            from agent.llm_agent import LLMAgent
+
+            executor = PaperExecutor()
+            llm_agent = LLMAgent(model=model, tracer=tracer, timeout_ms=timeout_ms)
 
         with sqlite3.connect(self.db_path) as conn:
             self._ensure_trade_table(conn)
@@ -83,12 +101,17 @@ class TradingLoop:
             for row in combined_rows:
                 symbol = str(row["symbol"])
                 trace_id = f"{symbol}-{row['timestamp']}"
-                decision = policy.decide(row, trace_id, heuristic_agent, llm_agent)
+                if mode == "backtest":
+                    decision = heuristic_agent.generate_signal(row)
+                    decision["escalated"] = False
+                    decision["escalation_reason"] = "backtest_simulation"
+                else:
+                    decision = policy.decide(row, trace_id, heuristic_agent, llm_agent)
                 result = {"action": "hold"}
                 if mode == "paper":
                     result = executor.submit_order(symbol, decision)
                 elif mode == "backtest":
-                    result = {"action": "simulated", "fill_price": float(row.get("close", 0.0))}
+                    result = self._simulate_fill(row, decision)
                 pnl_est = 0.0
                 if decision.get("signal") == "BUY":
                     pnl_est = float(row.get("close", 0.0)) * float(result.get("qty", 0))
