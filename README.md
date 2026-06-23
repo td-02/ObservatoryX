@@ -107,6 +107,21 @@ The current tests cover:
 - feature engineering invariants
 - escalation policy behavior
 
+## Benchmarks
+
+Local synthetic backtest stress test:
+
+- 10 symbols
+- 1,000 bars per symbol
+- 10,000 total bars processed
+- about 84.7 seconds end-to-end on this machine
+
+Notes:
+
+- Backtest mode stays fully local and does not require Alpaca or Ollama.
+- The current stress run uses synthetic minute bars, not live market data.
+- The shell on this machine still emits NumPy / PyArrow compatibility warnings, but the backtest completed successfully.
+
 ## Notes
 
 - Backtest mode is designed to work without Alpaca or Ollama installed.
